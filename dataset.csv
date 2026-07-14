@@ -1,0 +1,81 @@
+question,label
+What is FCFS scheduling?,OS
+Explain FCFS algorithm,OS
+What is Round Robin scheduling?,OS
+Explain Round Robin algorithm,OS
+What is CPU scheduling?,OS
+What is a process in operating system?,OS
+What is a thread in operating system?,OS
+Explain deadlock,OS
+What are the conditions of deadlock?,OS
+What is memory management?,OS
+Explain paging in operating system,OS
+What is segmentation in OS?,OS
+What is virtual memory?,OS
+What is context switching?,OS
+What is semaphore?,OS
+What is mutex?,OS
+What is starvation in OS?,OS
+What is priority scheduling?,OS
+What is SJF scheduling?,OS
+What is operating system?,OS
+What is Python?,Python
+Explain Python programming language,Python
+What is a Python list?,Python
+Explain Python list,Python
+What is a Python dictionary?,Python
+Explain dictionary in Python,Python
+What is a tuple in Python?,Python
+What is a set in Python?,Python
+What is a function in Python?,Python
+What is a loop in Python?,Python
+Explain for loop in Python,Python
+Explain while loop in Python,Python
+What is if else in Python?,Python
+What is a variable in Python?,Python
+What is a class in Python?,Python
+What is object oriented programming in Python?,Python
+What is exception handling in Python?,Python
+What is try except in Python?,Python
+What is inheritance in Python?,Python
+What is lambda function in Python?,Python
+What is TCP?,CN
+Explain TCP protocol,CN
+What is UDP?,CN
+Difference between TCP and UDP,CN
+What is DNS?,CN
+Explain DNS,CN
+What is HTTP?,CN
+What is HTTPS?,CN
+What is an IP address?,CN
+What is a MAC address?,CN
+What is a router?,CN
+What is a switch?,CN
+What is a hub?,CN
+What is a firewall?,CN
+What is a computer network?,CN
+What is network topology?,CN
+What is OSI model?,CN
+Explain TCP IP model,CN
+What is subnet mask?,CN
+What is a port number?,CN
+What is Java?,Java
+Explain Java programming language,Java
+What is inheritance in Java?,Java
+Explain inheritance in Java,Java
+What is polymorphism in Java?,Java
+Explain polymorphism in Java,Java
+What is encapsulation in Java?,Java
+What is abstraction in Java?,Java
+What is an interface in Java?,Java
+What is an abstract class in Java?,Java
+What is a constructor in Java?,Java
+What is method overloading in Java?,Java
+What is method overriding in Java?,Java
+What is exception handling in Java?,Java
+What is a class in Java?,Java
+What is an object in Java?,Java
+What is JVM?,Java
+What is JDK?,Java
+What is JRE?,Java
+What is a package in Java?,Java
