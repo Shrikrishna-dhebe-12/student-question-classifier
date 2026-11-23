@@ -9,6 +9,7 @@ from sklearn.preprocessing import LabelEncoder
 from config import (
     DL_METADATA_PATH,
     DL_MODEL_PATH,
+    MAX_FEATURES,
     MAX_SEQUENCE_LENGTH,
     MODEL_DIR,
     RANDOM_STATE,
@@ -30,110 +31,172 @@ def main():
 
     label_encoder = LabelEncoder()
 
-    y_train_encoded = label_encoder.fit_transform(y_train)
-    y_test_encoded = label_encoder.transform(y_test)
+    y_train = label_encoder.fit_transform(y_train)
+    y_test = label_encoder.transform(y_test)
 
     vectorizer = tf.keras.layers.TextVectorization(
-        max_tokens=5000,
+        max_tokens=MAX_FEATURES,
         output_mode="int",
         output_sequence_length=MAX_SEQUENCE_LENGTH
     )
 
-    train_text_tensor = tf.constant(
-        x_train.astype(str).to_numpy(),
-        dtype=tf.string
+    train_texts = x_train.astype(str).to_numpy()
+
+    vectorizer.adapt(
+        tf.data.Dataset.from_tensor_slices(train_texts).batch(256)
     )
 
-    vectorizer.adapt(train_text_tensor)
+    vocab_size = len(vectorizer.get_vocabulary())
+    num_classes = len(label_encoder.classes_)
 
-    inputs = tf.keras.Input(
-        shape=(1,),
-        dtype=tf.string,
-        name="question"
-    )
+    model = tf.keras.Sequential([
+        tf.keras.Input(shape=(1,), dtype=tf.string),
 
-    x = vectorizer(inputs)
+        vectorizer,
 
-    x = tf.keras.layers.Embedding(
-        input_dim=len(vectorizer.get_vocabulary()),
-        output_dim=64,
-        mask_zero=True
-    )(x)
+        tf.keras.layers.Embedding(
+            input_dim=vocab_size,
+            output_dim=128,
+            mask_zero=True
+        ),
 
-    x = tf.keras.layers.GlobalAveragePooling1D()(x)
+        tf.keras.layers.GlobalAveragePooling1D(),
 
-    x = tf.keras.layers.Dense(64, activation="relu")(x)
-    x = tf.keras.layers.Dropout(0.25)(x)
+        tf.keras.layers.Dense(
+            128,
+            activation="relu"
+        ),
 
-    x = tf.keras.layers.Dense(32, activation="relu")(x)
+        tf.keras.layers.Dropout(0.3),
 
-    outputs = tf.keras.layers.Dense(
-        len(label_encoder.classes_),
-        activation="softmax",
-        name="subject"
-    )(x)
+        tf.keras.layers.Dense(
+            64,
+            activation="relu"
+        ),
 
-    model = tf.keras.Model(
-        inputs=inputs,
-        outputs=outputs,
-        name="student_question_classifier"
-    )
+        tf.keras.layers.Dense(
+            num_classes,
+            activation="softmax"
+        )
+    ])
 
     model.compile(
-        optimizer="adam",
+        optimizer=tf.keras.optimizers.Adam(
+            learning_rate=0.001
+        ),
         loss="sparse_categorical_crossentropy",
         metrics=["accuracy"]
     )
 
-    x_train_tensor = tf.constant(
-        x_train.astype(str).to_numpy().reshape(-1, 1),
-        dtype=tf.string
+    train_ds = (
+        tf.data.Dataset
+        .from_tensor_slices(
+            (
+                tf.constant(
+                    train_texts.reshape(-1, 1),
+                    dtype=tf.string
+                ),
+                y_train
+            )
+        )
+        .shuffle(
+            len(train_texts),
+            seed=RANDOM_STATE
+        )
+        .batch(32)
+        .prefetch(tf.data.AUTOTUNE)
     )
 
-    x_test_tensor = tf.constant(
-        x_test.astype(str).to_numpy().reshape(-1, 1),
-        dtype=tf.string
+    test_texts = x_test.astype(str).to_numpy()
+
+    test_ds = (
+        tf.data.Dataset
+        .from_tensor_slices(
+            (
+                tf.constant(
+                    test_texts.reshape(-1, 1),
+                    dtype=tf.string
+                ),
+                y_test
+            )
+        )
+        .batch(32)
+        .prefetch(tf.data.AUTOTUNE)
     )
+
+    callbacks = [
+        tf.keras.callbacks.EarlyStopping(
+            monitor="val_loss",
+            patience=3,
+            restore_best_weights=True
+        )
+    ]
 
     model.fit(
-        x_train_tensor,
-        y_train_encoded,
-        validation_split=0.15,
-        epochs=12,
-        batch_size=16,
+        train_ds,
+        validation_data=test_ds,
+        epochs=20,
+        callbacks=callbacks,
         verbose=2
     )
 
     probabilities = model.predict(
-        x_test_tensor,
+        test_ds,
         verbose=0
     )
 
-    predictions = probabilities.argmax(axis=1)
+    predictions = np.argmax(
+        probabilities,
+        axis=1
+    )
 
     score = f1_score(
-        y_test_encoded,
+        y_test,
         predictions,
         average="weighted"
     )
 
-    logging.info("DL Weighted F1 Score: %.3f", score)
-
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-
-    model.save(DL_MODEL_PATH)
-
-    metadata = {
-        "classes": label_encoder.classes_.tolist()
-    }
-
-    DL_METADATA_PATH.write_text(
-        json.dumps(metadata, indent=2),
-        encoding="utf-8"
+    logging.info(
+        "DL Weighted F1 Score: %.4f",
+        score
     )
 
-    logging.info("DL model saved: %s", DL_MODEL_PATH)
-    logging.info("DL metadata saved: %s", DL_METADATA_PATH)
+    MODEL_DIR.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    model.save(
+        DL_MODEL_PATH,
+        save_format="keras"
+    )
+
+    metadata = {
+        "classes": label_encoder.classes_.tolist(),
+        "vocab_size": vocab_size,
+        "max_sequence_length": MAX_SEQUENCE_LENGTH
+    }
+
+    with open(
+        DL_METADATA_PATH,
+        "w",
+        encoding="utf-8"
+    ) as file:
+        json.dump(
+            metadata,
+            file,
+            indent=2
+        )
+
+    logging.info(
+        "DL model saved: %s",
+        DL_MODEL_PATH
+    )
+
+    logging.info(
+        "DL metadata saved: %s",
+        DL_METADATA_PATH
+    )
 
 
 if __name__ == "__main__":
