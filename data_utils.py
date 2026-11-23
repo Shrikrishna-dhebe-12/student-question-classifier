@@ -5,48 +5,65 @@ from sklearn.model_selection import train_test_split
 
 from config import DATA_PATH, RANDOM_STATE, TEST_SIZE
 
+_WHITESPACE_RE = re.compile(r"\s+")
+
 
 def normalize_question(value: str) -> str:
-    text = str(value).strip().lower()
-    text = re.sub(r"\s+", " ", text)
-    return text
+    return _WHITESPACE_RE.sub(
+        " ",
+        str(value).strip().lower()
+    )
 
 
 def load_dataset(path=DATA_PATH) -> pd.DataFrame:
-    if not path.exists():
+    if not path.is_file():
         raise FileNotFoundError(
             f"Dataset not found: {path}\n"
             "Create data/dataset.csv with question,label columns."
         )
 
-    df = pd.read_csv(path)
+    df = pd.read_csv(
+        path,
+        usecols=["question", "label"]
+    ).dropna()
 
-    required_columns = {"question", "label"}
-    missing_columns = required_columns - set(df.columns)
+    df["question"] = (
+        df["question"]
+        .astype(str)
+        .str.lower()
+        .str.replace(r"\s+", " ", regex=True)
+        .str.strip()
+    )
 
-    if missing_columns:
-        raise ValueError(
-            f"Missing columns: {missing_columns}. Required: question,label"
-        )
+    df["label"] = (
+        df["label"]
+        .astype(str)
+        .str.strip()
+    )
 
-    df = df[["question", "label"]].dropna().copy()
-
-    df["question"] = df["question"].apply(normalize_question)
-    df["label"] = df["label"].astype(str).str.strip()
-
-    df = df[
+    df = df.loc[
         (df["question"] != "") &
         (df["label"] != "")
-    ].drop_duplicates()
+    ].drop_duplicates(ignore_index=True)
 
-    if len(df) < 10:
-        raise ValueError("Dataset must contain at least 10 valid rows.")
+    rows = len(df)
 
-    if df["label"].nunique() < 2:
-        raise ValueError("Dataset must contain at least 2 subject labels.")
+    if rows < 10:
+        raise ValueError(
+            "Dataset must contain at least 10 valid rows."
+        )
 
-    if df["label"].value_counts().min() < 2:
-        raise ValueError("Every label needs at least 2 examples.")
+    label_counts = df["label"].value_counts()
+
+    if len(label_counts) < 2:
+        raise ValueError(
+            "Dataset must contain at least 2 subject labels."
+        )
+
+    if (label_counts < 2).any():
+        raise ValueError(
+            "Every label needs at least 2 examples."
+        )
 
     return df
 
@@ -57,5 +74,6 @@ def split_dataset(df: pd.DataFrame):
         df["label"],
         test_size=TEST_SIZE,
         random_state=RANDOM_STATE,
-        stratify=df["label"]
+        stratify=df["label"],
+        shuffle=True
     )
