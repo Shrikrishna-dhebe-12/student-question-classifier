@@ -3,12 +3,12 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
-from answer_engine import generate_answer
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from predict import load_artifacts, predict_subject
+from answer_engine import generate_answer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,7 +35,7 @@ ANSWER_TEMPLATES = {
     "Java": (
         "Java is an object-oriented programming language. Inheritance allows "
         "one class to reuse another class, while polymorphism supports multiple behaviors."
-    )
+    ),
 }
 
 FALLBACK_ANSWER = (
@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AI Student Question Classifier",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan
 )
 
@@ -85,13 +85,13 @@ app.mount(
 )
 
 
-@app.get("/")
-def home():
+@app.get("/", include_in_schema=False)
+async def home():
     return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health")
-def health():
+async def health():
     return {
         "status": "ok",
         "message": "StudentAI backend is running"
@@ -99,9 +99,19 @@ def health():
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(payload: PredictRequest):
+async def predict(payload: PredictRequest):
+    question = payload.question.strip()
+
     try:
-        result = predict_subject(payload.question)
+        result = predict_subject(question)
+
+        result["answer"] = generate_answer(
+            question=question,
+            subject=result["subject"],
+            confidence=result["confidence"]
+        )
+
+        return result
 
     except FileNotFoundError as error:
         raise HTTPException(
@@ -113,13 +123,12 @@ def predict(payload: PredictRequest):
         logging.exception("Prediction error")
         raise HTTPException(
             status_code=500,
-            detail=f"Prediction failed: {str(error)}"
+            detail="Prediction failed"
         ) from error
 
-    result["answer"] = generate_answer(
-        question=payload.question,
-        subject=result["subject"],
-        confidence=result["confidence"]
-    )
 
-    return result
+@app.get("/subjects")
+async def subjects():
+    return {
+        "subjects": tuple(ANSWER_TEMPLATES.keys())
+    }
